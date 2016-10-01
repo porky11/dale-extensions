@@ -1,0 +1,41 @@
+(module math-concepts)
+
+
+(import macros)
+(import concepts)
+(import concept-defs)
+
+
+
+(using-namespace std.macros
+(using-namespace std.concepts
+
+(def-concept Add (refines Type) (T) 
+  (let ((success \ true))
+    (concept-assert (exists-fn mc (qq (uq T) + (uq T) (uq T))) T "+ is not defined over this type")
+    success))
+
+(def-concept Sub (refines Type) (T) 
+  (let ((success \ true))
+    (concept-assert (exists-fn mc (qq (uq T) - (uq T) (uq T))) T "- is not defined over this type")
+    success))
+
+(def-concept Div (refines Type) (T) 
+  (let ((success \ true))
+    (concept-assert (exists-fn mc (qq (uq T) / (uq T) (uq T))) T "/ is not defined over this type")
+    success))
+
+(def-concept Mul (refines Type) (T) 
+  (let ((success \ true))
+    (concept-assert (exists-fn mc (qq (uq T) * (uq T) (uq T))) T "/ is not defined over this type")
+    success))
+
+(def-concept BasicMath (refines Add Sub Div Mul) (T) true)
+
+(def-concept-macro basic-math extern ((T Type))
+  (qq do (instantiate + (uq T))
+         (instantiate - (uq T))
+         (instantiate * (uq T))
+         (instantiate / (uq T))))
+))
+

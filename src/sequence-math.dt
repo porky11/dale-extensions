@@ -1,0 +1,110 @@
+(module sequence-math)
+
+
+(import cstdio)
+(import stdlib)
+(import array)
+(import macros)
+(import concepts)
+(import assert)
+(import algorithms)
+(import math-concepts)
+
+
+(using-namespace std.macros
+(using-namespace std.concepts
+
+#|
+(def-concept-macro Array extern ((T Add) (N Value))
+  (let ((A \ (qq Array (uq T) (uq N))))
+    (qq instantiate + (uq A))))
+
+(def-concept-macro Array extern ((T Sub) (N Value))
+  (let ((A \ (qq Array (uq T) (uq N))))
+    (qq instantiate - (uq A))))
+
+(def-concept-macro Array extern ((T Mul) (N Value))
+  (let ((A \ (qq Array (uq T) (uq N))))
+    (qq instantiate * (uq A))))
+
+(def-concept-macro Array extern ((T Div) (N Value))
+  (let ((A \ (qq Array (uq T) (uq N))))
+    (qq instantiate / (uq A))))
+
+(def-concept-macro Array extern ((T BasicMath) (N Value))
+  (let ((A \ (qq Array (uq T) (uq N))))
+    (qq instantiate basic-math (uq A))))
+|#
+
+(def-concept-macro + extern ((T Container))
+    (assert-concept (value-type (nullptr (uq T))) Add)
+    (using-namespace std.macros
+    (qq do
+      (import unistd)
+      (def + (fn extern (retval (uq T)) ((a (uq T)) (b (uq T)))
+        (let ((size \ (size a)))
+          (and (!= (size a) (size b)) (do (fprintf stderr "containers are not of equal size\n") (abort)))
+          (let ((ab \ (begin a))
+                (bb \ (begin b))
+                (ob \ (begin (@ retval)))
+                (ae \ (end a)))
+            (for true (!= ab ae)
+              (do (setv ab (successor ab))
+                  (setv bb (successor bb))
+                  (setv ob (successor ob)))
+              (sink ob (+ (@ (source ab)) (@ (source bb)))))))
+        (return))))))
+
+(def-concept-macro - extern ((T Container))
+  (assert-concept (value-type (nullptr (uq T))) Sub)
+  (using-namespace std.macros
+  (qq do
+    (import unistd)
+    (def - (fn extern (retval (uq T)) ((a (uq T)) (b (uq T)))
+      (let ((size \ (size a)))
+        (and (!= (size a) (size b)) (do (fprintf stderr "containers are not of equal size\n") (abort)))
+        (let ((ab \ (begin a))
+              (bb \ (begin b))
+              (ob \ (begin (@ retval)))
+              (ae \ (end a)))
+          (for true (!= ab ae)
+            (do (setv ab (successor ab))
+                (setv bb (successor bb))
+                (setv ob (successor ob)))
+            (sink ob (- (@ (source ab)) (@ (source bb)))))))
+      (return))))))
+
+(def-concept-macro / extern ((T Container))
+  (assert-concept (value-type (nullptr (uq T))) Div)
+    (using-namespace std.macros
+    (qq do
+      (import unistd)
+      (def / (fn extern (retval (uq T)) ((a (uq T)) (b (value-type (nullptr (uq T)))))
+        (let ((size \ (size a)))
+          (let ((ab \ (begin a))
+                (ob \ (begin (@ retval)))
+                (ae \ (end a)))
+            (for true (!= ab ae)
+              (do (setv ab (successor ab))
+                  (setv ob (successor ob)))
+              (sink ob (/ (@ (source ab)) b)))))
+        (return))))))
+
+(def-concept-macro * extern ((T Container))
+  (assert-concept (value-type (nullptr (uq T))) Mul)
+    (using-namespace std.macros
+    (qq do
+      (import unistd)
+      (def * (fn extern (retval (uq T)) ((a (uq T)) (b (value-type (nullptr (uq T)))))
+        (let ((size \ (size a)))
+          (let ((ab \ (begin a))
+                (ob \ (begin (@ retval)))
+                (ae \ (end a)))
+            (for true (!= ab ae)
+              (do (setv ab (successor ab))
+                  (setv ob (successor ob)))
+              (sink ob (* (@ (source ab)) b)))))
+        (return))))))
+
+))
+
