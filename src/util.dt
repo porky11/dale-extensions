@@ -1,5 +1,6 @@
 (module util)
 
+(import stdlib)
 (import macros)
 (import concepts)
 (import cstdlib)
@@ -21,9 +22,6 @@ Useful for debug reasons, when you know some error appears before this macro is 
 
 
 (using-namespace std.macros
-
-(def ignore (macro extern (rest)
-  (qq no-op)))
 
   
 
@@ -63,7 +61,7 @@ Useful for debug reasons, when you know some error appears before this macro is 
   (def list (var auto \ (get-varargs-list mc (- (arg-count mc) 1) rest)))
   (qq if (uq con) false (do (uql list)))))
 
-(ignore def in (macro extern (name value rest)
+(def in (macro extern (name value rest)
   (let ((list \ (get-varargs-list mc (- (arg-count mc) 2) rest))
         (en \ (make-gensym-var-node mc))
         (bn \ (make-gensym-var-node mc)))
@@ -77,9 +75,6 @@ Useful for debug reasons, when you know some error appears before this macro is 
         (qq let (((uq val) \ (uq value)))
           (in (uq name) (uq val) (uql list))))))))
 
-)
-
-(using-namespace std.macros
 
 
 (def def-type-macro2
@@ -92,6 +87,20 @@ Useful for debug reasons, when you know some error appears before this macro is 
             (macro extern (T U)
               (let ((typename (array-of 250 char)))
                 (and (not (make-type-string mc (uq string) T U typename))
+                     (return T))
+                (def n (var auto (p DNode) (mnfv mc typename)))
+                n))))))))
+
+(def def-type-macro3
+  (macro extern (name)
+    (let ((buf (array-of 250 char)))
+      (sprintf buf "\"%s\"" (@:@ name token-str))
+      (let ((string \ (std.macros.mnfv mc buf)))
+        (qq do
+          (def (uq name)
+            (macro extern (T U V)
+              (let ((typename (array-of 250 char)))
+                (and (not (make-type-string mc (uq string) T U V typename))
                      (return T))
                 (def n (var auto (p DNode) (mnfv mc typename)))
                 n))))))))
@@ -168,7 +177,7 @@ Useful for debug reasons, when you know some error appears before this macro is 
 
   (def make-list (macro extern (a)
     (qq (uq a))))
-  
+
   (def make-list (macro extern (a rest)
     (let ((list \ (get-varargs-list mc (- (arg-count mc) 1) rest)))
       (qq (uq a) (make-list (uql list))))))
@@ -211,6 +220,48 @@ Useful for debug reasons, when you know some error appears before this macro is 
   (for (i int 1) (< i k) (incv i)
     (mulf retval (/ (- (+ n 1) i) i)))))
 
+
+(import operator-macros)
+(def-left-associative-macro @$' extern @$)
+
+(ignore def my-make-list (fn (attr cto) intern (p DNode) ((mc MContext) (list (p DNode)))
+  (let ((list-node (p DNode) list))
+    (and (!= (@:@ list is-list) 0)
+       (setv list-node (@:@ list list-node)))
+    (qq (uq list-node) (uql (@:@ (my-make-list (@:@ list next-node)) list-node))))))
+(macro-print zero)
+
+(def apply-list
+  (fn (attr cto) extern (p DNode)
+      ((mc (p MContext))
+       (list (p DNode))
+       (data (p void))
+       (fun (p (fn (p DNode) ((mc (p MContext))
+                              (node (p DNode))
+                              (data (p void)))))))
+    (let ((elt \ (fun mc list data)))
+      (if (not (null (@:@ list next-node)))
+        (let ((rest \ (@:@ (apply-list mc (@:@ list next-node) data fun) list-node)))
+          (qq (uq elt) (uql rest)))
+        (qq (uq elt))))))
+
+(macro-print one)
+
+(def with-slots-tmp (var intern (p DNode)))
+
+(def with-slots (macro extern (list value rest)
+  (setv with-slots-tmp (make-gensym-var-node mc))
+  (if (is-lvalue mc value)
+    (do (report-error mc value "`with-slots` currently only works with rvalues") (qq no-op))
+    (qq let (((uq with-slots-tmp) \ (uq value)))
+      (let (uq (apply-list mc list (nullptr void)
+        (fn (attr cto) (p DNode) ((mc (p MContext)) (node (p DNode)) (data (p void)))
+          (qq (uq node) \ (@: (uq with-slots-tmp) val))))))))))
+
+(ignore def test (fn intern void (void)
+  (with-slots (a b c) n
+    (* a b))))
+;(mexit)
 (ignore using-namespace std.concepts
 (def + (macro extern (a b)
   (let ((A \ (type-of mc a false))
