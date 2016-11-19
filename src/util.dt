@@ -70,20 +70,15 @@ Useful for debug reasons, when you know some error appears before this macro is 
       (def (uq name) (fn (uq linkage) (uq type) (uq args)
         (uq fdef)))))))
 
-(ignore def defc (macro extern (name linkage cname type)
-  (let ((fdef \ (qq (uq cname))))
+(def defc-multi (macro extern (name linkage def0 rest)
+  (def list (var auto \ (get-varargs-list mc (- (arg-count mc) 3) rest)))
+  (ignore assert (not (= 0 (@:@ def0 is-list))))
+  (def defc (var auto \ (qq defc (uq name) (uq linkage) (uql (@:@ def0 list-node)))))
+  (if (null list)
+    defc
     (qq do
-      (def (uq cname) (fn extern-c (uq type) (uq args)))
-      (def (uq name) (fn (uq linkage) (uq type) (uq args)
-        ((uq cname) (uql arg-list))))))))
-
-(ignore def defc-multi (macro extern (name linkage def0 rest)
-  (qq do
-    (defc (uq name) (uq linkage) (uql def0))
-    (defc-multi (uq name) (uq linkage) (uql (get-varargs-list mc (- (arg-count mc) 3) rest))))))
-
-(ignore def defc-multi (macro extern (name linkage)
-  (qq no-op)))
+      (uq defc)
+      (defc-multi (uq name) (uq linkage) (uql list))))))
 
 
 
