@@ -4,6 +4,7 @@
 (import macros)
 (import concepts)
 (import cstdlib)
+(import operator-macros)
 
 #|
 @macro mexit
@@ -47,10 +48,10 @@ Useful for debug reasons, when you know some error appears before this macro is 
 
 
 (def arg-list-names (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)))
-  (unless (= 0 (@:@ form is-list))
-    (when (p= (@:@ form list-node) (q void))
-      (printf "defc-void\n")
-      (return (make-node mc))))
+  (and (not (= 0 (@:@ form is-list)))
+       (= 0 (@:' form list-node is-list))
+       (= 0 (strncmp (@:' form list-node token-str) "void" (cast 4 size)))
+       (return (nullptr DNode)))
   (let ((list \
          (apply-list mc (@:@ form list-node) (nullptr void)
            (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (data (p void)))
@@ -62,11 +63,12 @@ Useful for debug reasons, when you know some error appears before this macro is 
 
 (def defc (macro extern (name linkage cname type args)
   (let ((arg-list \ (arg-list-names mc args))
-        (fdef \ (qq (uq cname) (uql-nc arg-list))))
+        (fdef \ (if (null arg-list) (qq (uq cname))
+                                    (qq (uq cname) (uql-nc arg-list)))))
     (qq do
       (def (uq cname) (fn extern-c (uq type) (uq args)))
       (def (uq name) (fn (uq linkage) (uq type) (uq args)
-        ((uq cname) (uql arg-list))))))))
+        (uq fdef)))))))
 
 (ignore def defc (macro extern (name linkage cname type)
   (let ((fdef \ (qq (uq cname))))
@@ -75,14 +77,12 @@ Useful for debug reasons, when you know some error appears before this macro is 
       (def (uq name) (fn (uq linkage) (uq type) (uq args)
         ((uq cname) (uql arg-list))))))))
 
-
-
-(def defc-multi (macro extern (name linkage def0 rest)
+(ignore def defc-multi (macro extern (name linkage def0 rest)
   (qq do
     (defc (uq name) (uq linkage) (uql def0))
-    (defc-multi (uq name) (uq linkage) (get-varargs-list (- (arg-count mc) 3) rest)))))
+    (defc-multi (uq name) (uq linkage) (uql (get-varargs-list mc (- (arg-count mc) 3) rest))))))
 
-(def defc-multi (macro extern (name linkage)
+(ignore def defc-multi (macro extern (name linkage)
   (qq no-op)))
 
 
