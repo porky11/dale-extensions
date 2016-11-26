@@ -1,10 +1,14 @@
 (module util)
 
+(import cstdio)
+(import macros)
+(import concepts)
+(import ctype)
 (import stdlib)
 (import macros)
 (import concepts)
 (import cstdlib)
-(import operator-macros)
+;(import operator-macros)
 
 #|
 @macro mexit
@@ -32,6 +36,15 @@ Useful for debug reasons, when you know some error appears before this macro is 
   (def list (var auto \ (get-varargs-list mc (- (arg-count mc) 1) rest)))
   (qq if (uq con) false (do (uql list)))))
 
+(def print (fn intern void ((a bool))
+  (printf (if a "true" "false"))))
+
+(def print-val (macro extern (object)
+  (qq let ((object \ (uq object)))
+    (print object)
+    (printf "\n")
+    object)))
+
 (def apply-list
   (fn (attr cto) extern (p DNode)
       ((mc (p MContext))
@@ -49,9 +62,10 @@ Useful for debug reasons, when you know some error appears before this macro is 
 
 (def arg-list-names (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)))
   (and (not (= 0 (@:@ form is-list)))
-       (= 0 (@:' form list-node is-list))
-       (= 0 (strncmp (@:' form list-node token-str) "void" (cast 4 size)))
-       (return (nullptr DNode)))
+    (and (= 0 (@:' form list-node is-list))
+      (and (= 0 (strncmp (@:' form list-node token-str) "void" (cast 4 size)))
+        ;; (= (@:' form list-node) (q void))
+        (return (nullptr DNode)))))
   (let ((list \
          (apply-list mc (@:@ form list-node) (nullptr void)
            (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (data (p void)))
@@ -59,7 +73,6 @@ Useful for debug reasons, when you know some error appears before this macro is 
                form
                (@:@ form list-node))))))
     (@:@ list list-node))))
-
 
 (def defc (macro extern (name linkage cname type args)
   (let ((arg-list \ (arg-list-names mc args))
@@ -69,6 +82,56 @@ Useful for debug reasons, when you know some error appears before this macro is 
       (def (uq cname) (fn extern-c (uq type) (uq args)))
       (def (uq name) (fn (uq linkage) (uq type) (uq args)
         (uq fdef)))))))
+
+(def replace-enum-names (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)) (enum-type (p (p DNode))) (typed bool))
+  (def data (var auto (array-of 2 (p void)) (array (cast enum-type (p void)) (cast (# typed) (p void)))))
+  (apply-list mc (@:@ form list-node) (cast (# data) (p void))
+    (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (data (p void)))
+      (def arr (var auto \ (cast data (p (array-of 2 (p void))))))
+      (def enum-type (var auto \ (cast (@$ (@ arr) 0) (p (p DNode)))))
+      (def typed (var auto \ (cast (@$ (@ arr) 1) (p bool))))
+      (if (or (= 0 (@:@ form is-list))
+            (or (null (@:@ form list-node))
+              (or (null (@:' form list-node next-node))
+                (or (= 0 (@:' form list-node next-node is-list))
+                  (or (null (@:' form list-node next-node list-node))
+                    ;;(not (= (@:' form list-node next-node list-node) (q enum)))
+                    (not (= 0 (strncmp (@:' form list-node next-node list-node token-str) "enum" (cast 4 size))))
+                    )))))
+        form
+        (do
+          (unless (null enum-type)
+            (setf enum-type (@:' form list-node next-node list-node next-node)))
+          (let ((list-node \ (@:@ form list-node)))
+            (if (@ typed)
+              (qq (uq list-node) enum)
+              list-node))))))))
+
+
+(def def-enum-fn-ext (macro extern (name linkage fname flinkage ret param rest)
+  (def enum-type (var auto (p DNode) (q 1)))
+  (def names (var auto \ (arg-list-names mc param)))
+  (def nparam (var auto \ (replace-enum-names mc param (# enum-type) true)))
+  (def mparam (var auto \ (replace-enum-names mc param (nullptr (p DNode)) false)))
+  (def list (var auto \ (get-varargs-list mc (- (arg-count mc) 6) rest)))
+  (def fdef (var auto \
+    (if (null list)
+      (qq def (uq fname) (fn (uq flinkage) (uq ret) (uq nparam)))
+      (qq def (uq fname) (fn (uq flinkage) (uq ret) (uq nparam)
+        (uql list))))))
+  (qq do
+    (namespace (uq name)
+      (def-enum enum (uq linkage) (uql enum-type))
+      (uq fdef))
+    (def (uq name) (macro (uq linkage) (uq mparam)
+      (qq (uq fname) (uql names)))))))
+
+(def def-enum-fn (macro extern (name linkage ret param rest)
+  (def list (var auto \ (get-varargs-list mc (- (arg-count mc) 4) rest)))
+  (qq def-enum-fn-ext (uq name) (uq linkage) fn (uq linkage) (uq ret) (uq param) (uql list))))
+
+(def defc-enum (macro extern (name linkage cname ret param)
+  (qq def-enum-fn-ext (uq name) (uq linkage) (uq cname) extern-c (uq ret) (uq param))))
 
 (def defc-multi (macro extern (name linkage def0 rest)
   (def list (var auto \ (get-varargs-list mc (- (arg-count mc) 3) rest)))
@@ -80,6 +143,7 @@ Useful for debug reasons, when you know some error appears before this macro is 
       (uq defc)
       (defc-multi (uq name) (uq linkage) (uql list))))))
 
+(import operator-macros)
 
 
 (def pow (macro extern (x (n int))
@@ -123,9 +187,36 @@ Useful for debug reasons, when you know some error appears before this macro is 
           (uql list)))
       (let ((val \ (make-gensym-var-node mc)))
         (qq let (((uq val) \ (uq value)))
-          (in (uq name) (uq val) (uql list))))))))
+      (in (uq name) (uq val) (uql list))))))))
 
+(def tts (fn (attr cto) intern bool ((mc (p MContext)) (T (p DNode)) (buf (p char)))
+  (if (and (= 0 (@:@ T is-list))
+         (std.isdigit (@ (@:@ T token-str))))
+    (do (sprintf buf "%s" (@:@ T token-str))
+        true)
+    (type-to-string mc T buf))))
 
+(def make-type-stringf
+  (fn (attr cto) extern bool ((mc (p MContext))
+                   (prefix (p (const char)))
+                   (T1 (p DNode))
+                   (T2 (p DNode))
+                   (T3 (p DNode))
+                   (buf (p char)))
+    (let ((tstr1 (array-of 250 char))
+          (tstr2 (array-of 250 char))
+          (tstr3 (array-of 250 char)))
+      (setf ($ tstr1 0) #\NULL)
+      (setf ($ tstr2 0) #\NULL)
+      (setf ($ tstr3 0) #\NULL)
+      (and (not (tts mc T1 tstr1))
+           (return false))
+      (and (not (tts mc T2 tstr2))
+           (return false))
+      (and (not (tts mc T3 tstr3))
+           (return false))
+      (sprintf buf "%s%s%s%s" prefix tstr1 tstr2 tstr3)
+true)))
 
 (def def-type-macro2
   (macro extern (name)
@@ -150,7 +241,7 @@ Useful for debug reasons, when you know some error appears before this macro is 
           (def (uq name)
             (macro extern (T U V)
               (let ((typename (array-of 250 char)))
-                (and (not (make-type-string mc (uq string) T U V typename))
+                (and (not (make-type-stringf mc (uq string) T U V typename))
                      (return T))
                 (def n (var auto (p DNode) (mnfv mc typename)))
                 n))))))))
@@ -271,7 +362,6 @@ Useful for debug reasons, when you know some error appears before this macro is 
     (mulf retval (/ (- (+ n 1) i) i)))))
 
 
-(import operator-macros)
 (def-left-associative-macro @$' extern @$)
 
 (ignore def my-make-list (fn (attr cto) intern (p DNode) ((mc MContext) (list (p DNode)))
