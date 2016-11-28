@@ -10,23 +10,60 @@
 (import cstdlib)
 ;(import operator-macros)
 
+
+
+(using-namespace std.macros
+
 #|
 @macro mexit
 
 Stops the compiliation of program.
-Useful for debug reasons, when you know some error appears before this macro is expanded.
+Useful for debug reasons, when you know some error appears before this macro is expanded, for example, when calling the compiler with --print-expansions to find the macro
 
 |#
+
+
 (using-namespace std
 (def mexit (macro extern (void)
   (exit 1)
-  (q 0)))
+  (make-node mc)))
 )
 
 
+#|
+@macro fn
 
 
-(using-namespace std.macros
+|#
+
+(def apply-list
+  (fn (attr cto) extern (p DNode)
+      ((mc (p MContext))
+       (list (p DNode))
+       (data (p void))
+       (fun (p (fn (p DNode) ((mc (p MContext))
+                              (node (p DNode))
+                              (data (p void)))))))
+    (let ((elt \ (fun mc list data)))
+      (if (not (null (@:@ list next-node)))
+        (let ((rest \ (@:@ (apply-list mc (@:@ list next-node) data fun) list-node)))
+          (qq (uq elt) (uql rest)))
+        (qq (uq elt))))))
+
+(def arg-types (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)))
+  (apply-list mc form (nullptr void)
+    (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (a (p void)))
+      (type-of mc form false)))))
+
+(def wrap-list (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)) (name (p DNode)))
+  (@:@ 
+    (apply-list mc form (cast name (p void))
+      (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (a (p void)))
+        (let ((name \ (cast a (p DNode))))
+          (qq (uq name) (uq form)))))
+  list-node)))
+
+
 
 (def when (macro extern (con rest)
   (def list (var auto \ (get-varargs-list mc (- (arg-count mc) 1) rest)))
@@ -45,19 +82,6 @@ Useful for debug reasons, when you know some error appears before this macro is 
     (printf "\n")
     object)))
 
-(def apply-list
-  (fn (attr cto) extern (p DNode)
-      ((mc (p MContext))
-       (list (p DNode))
-       (data (p void))
-       (fun (p (fn (p DNode) ((mc (p MContext))
-                              (node (p DNode))
-                              (data (p void)))))))
-    (let ((elt \ (fun mc list data)))
-      (if (not (null (@:@ list next-node)))
-        (let ((rest \ (@:@ (apply-list mc (@:@ list next-node) data fun) list-node)))
-          (qq (uq elt) (uql rest)))
-        (qq (uq elt))))))
 
 
 (def arg-list-names (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)))
@@ -384,7 +408,7 @@ true)))
 (ignore def test (fn intern void (void)
   (with-slots (a b c) n
     (* a b))))
-;(mexit)
+
 (ignore using-namespace std.concepts
 (def + (macro extern (a b)
   (let ((A \ (type-of mc a false))
