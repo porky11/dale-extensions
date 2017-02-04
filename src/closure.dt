@@ -1,0 +1,26 @@
+(module closure)
+
+(import macros)
+(import util)
+
+(using-namespace std.macros
+(def closure (macro extern (bindings rtype arg-list rest)
+  (let ((list \ (get-varargs-list mc (- (arg-count mc) 3) rest))
+        (typed-bindings \ (typed-list mc (@:@ bindings list-node)))
+        (bindings-struct-name \ (make-gensym-var-node mc))
+        (closure-struct-name \ (make-gensym-var-node mc))
+        (arg-list0 \ (@:@ arg-list list-node))
+        (closure-arg-list \ (qq (uq struct-name) (uql arg-list))))
+    (qq do
+      (def (uq struct-name) (struct intern (uq typed-list)))
+      (def (uq closure-struct-name) (struct intern (uq typed-list)))
+      (def (
+      (fn (uq rtype) (uq arg-list)
+        (uql body))))
+
+
+(instantiate-closure int ((a int) (b int)))
+
+
+
+

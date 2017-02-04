@@ -36,7 +36,7 @@ Useful for debug reasons, when you know some error appears before this macro is 
 
 |#
 
-(def apply-list
+(def map-nodes
   (fn (attr cto) extern (p DNode)
       ((mc (p MContext))
        (list (p DNode))
@@ -46,18 +46,24 @@ Useful for debug reasons, when you know some error appears before this macro is 
                               (data (p void)))))))
     (let ((elt \ (fun mc list data)))
       (if (not (null (@:@ list next-node)))
-        (let ((rest \ (@:@ (apply-list mc (@:@ list next-node) data fun) list-node)))
+        (let ((rest \ (@:@ (map-nodes mc (@:@ list next-node) data fun) list-node)))
           (qq (uq elt) (uql rest)))
         (qq (uq elt))))))
 
 (def arg-types (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)))
-  (apply-list mc form (nullptr void)
+  (map-nodes mc form (nullptr void)
     (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (a (p void)))
-      (type-of mc form false)))))
+      (type-of mc form true)))))
+
+(def typed-list (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)))
+  (map-nodes mc form (nullptr void)
+    (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (a (p void)))
+      (let ((type \ (type-of mc form true)))
+        (qq (uq form) (uq type)))))))
 
 (def wrap-list (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)) (name (p DNode)))
   (@:@ 
-    (apply-list mc form (cast name (p void))
+    (map-nodes mc form (cast name (p void))
       (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (a (p void)))
         (let ((name \ (cast a (p DNode))))
           (qq (uq name) (uq form)))))
@@ -91,12 +97,13 @@ Useful for debug reasons, when you know some error appears before this macro is 
         ;; (= (@:' form list-node) (q void))
         (return (nullptr DNode)))))
   (let ((list \
-         (apply-list mc (@:@ form list-node) (nullptr void)
+         (map-nodes mc (@:@ form list-node) (nullptr void)
            (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (data (p void)))
              (if (= 0 (@:@ form is-list))
                form
                (@:@ form list-node))))))
     (@:@ list list-node))))
+
 
 (def defc (macro extern (name linkage cname type args)
   (let ((arg-list \ (arg-list-names mc args))
@@ -107,9 +114,20 @@ Useful for debug reasons, when you know some error appears before this macro is 
       (def (uq name) (fn (uq linkage) (uq type) (uq args)
         (uq fdef)))))))
 
+(def defc-multi (macro extern (name linkage def0 rest)
+  (def list (var auto \ (get-varargs-list mc (- (arg-count mc) 3) rest)))
+  (ignore assert (not (= 0 (@:@ def0 is-list))))
+  (def defc (var auto \ (qq defc (uq name) (uq linkage) (uql (@:@ def0 list-node)))))
+  (if (null list)
+    defc
+    (qq do
+      (uq defc)
+      (defc-multi (uq name) (uq linkage) (uql list))))))
+
+
 (def replace-enum-names (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)) (enum-type (p (p DNode))) (typed bool))
   (def data (var auto (array-of 2 (p void)) (array (cast enum-type (p void)) (cast (# typed) (p void)))))
-  (apply-list mc (@:@ form list-node) (cast (# data) (p void))
+  (map-nodes mc (@:@ form list-node) (cast (# data) (p void))
     (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (data (p void)))
       (def arr (var auto \ (cast data (p (array-of 2 (p void))))))
       (def enum-type (var auto \ (cast (@$ (@ arr) 0) (p (p DNode)))))
@@ -157,15 +175,6 @@ Useful for debug reasons, when you know some error appears before this macro is 
 (def defc-enum (macro extern (name linkage cname ret param)
   (qq def-enum-fn-ext (uq name) (uq linkage) (uq cname) extern-c (uq ret) (uq param))))
 
-(def defc-multi (macro extern (name linkage def0 rest)
-  (def list (var auto \ (get-varargs-list mc (- (arg-count mc) 3) rest)))
-  (ignore assert (not (= 0 (@:@ def0 is-list))))
-  (def defc (var auto \ (qq defc (uq name) (uq linkage) (uql (@:@ def0 list-node)))))
-  (if (null list)
-    defc
-    (qq do
-      (uq defc)
-      (defc-multi (uq name) (uq linkage) (uql list))))))
 
 (import operator-macros)
 
@@ -334,7 +343,9 @@ Useful for debug reasons, when you know some error appears before this macro is 
         (or errb (report-error mc b "Unable to eval"))
         (if (< x y)
           (qq (uq a) (uql (@:@ (range-fn mc (mnfv mc (+ x 1)) b) list-node)))
-          (qq (uq a))))))
+          (if (> x y)
+            (qq (uq a) (uql (@:@ (range-fn mc (mnfv mc (- x 1)) b) list-node)))
+            (qq (uq a)))))))
 
   (def range (macro extern (a b)
     (range-fn mc a b)))
@@ -385,7 +396,7 @@ Useful for debug reasons, when you know some error appears before this macro is 
   (if (is-lvalue mc value)
     (do (report-error mc value "`with-slots` currently only works with rvalues") (qq no-op))
     (qq let (((uq with-slots-tmp) \ (uq value)))
-      (let (uq (apply-list mc list (nullptr void)
+      (let (uq (map-nodes mc list (nullptr void)
         (fn (attr cto) (p DNode) ((mc (p MContext)) (node (p DNode)) (data (p void)))
           (qq (uq node) \ (@: (uq with-slots-tmp) val))))))))))
 
@@ -407,6 +418,11 @@ Useful for debug reasons, when you know some error appears before this macro is 
           (as-macro (qq + (uq a) (uq b)))
           (as-macro (qq no-op)))))))
 )
+
+(def main (macro extern (rest)
+  (def list (var auto \ (get-varargs-list mc (arg-count mc) rest)))
+  (qq def main (fn extern-c (uql list)))))
+
 )
 
 

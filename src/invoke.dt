@@ -1,0 +1,23 @@
+(module invoke)
+
+(import macros)
+(import util)
+
+(using-namespace std.macros
+
+(def call (macro extern (fn rest)
+    (let ((op-node \ (@:@ form list-node))
+          (arg-nodes \ (@:@ op-node next-node))
+          (valtype \ (type-of mc op-node false))
+          (rtype \ (type-of mc form false))
+          (arg-types \ (@:@ (arg-types mc arg-nodes) list-node))) 
+
+(def with-call (macro extern (rest)
+  (let ((list \ (get-varargs-list mc (- (arg-count mc) 1) rest)))
+    (if (null list)
+      (do report-error mc list "with-call"
+        (no-op))
+      (let ((calling-list \ (wrap-list mc list (q with-call))))
+        (qq call (with-call fname) (uql calling-list)))
+
+)

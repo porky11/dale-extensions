@@ -1,0 +1,104 @@
+(import cstdlib)
+(import cstdio)
+(import macros)
+(import introspection)
+
+
+(def strtok (fn extern-c (p char) ((a (p char)) (b (p (const char))))))
+
+(def strsep (fn extern-c (p char) ((a (p (p char))) (b (p (const char))))))
+
+(def readline (fn extern-c (p char) ((a (p char)))))
+
+(def sleep (fn extern-c uint ((a uint))))
+
+(def nanosleep (fn extern-c uint ((a uint))))
+
+(using-namespace std.macros
+
+(def print (fn intern void (void)
+  (printf "printing\n")))
+
+(def exit (fn intern void (void)
+  (exit 0)))
+
+(std.concepts.instantiate (vector char))
+
+(def parse-word (fn intern void ((in (p file)))
+  (
+
+(def parse (fn intern (retval (p DNode)) ((in (p file)))
+  (setf retval (nullptr DNode))
+  (def current-node (var auto \ (nullptr DNode)))
+  (for (c char)
+       (not (feof in))
+       (setv c (getc in))
+    (or (isspace c)
+      (let ((next-node \
+             (if (= c #\( )
+               (parse in)
+               (if (= c #\) )
+                 (return)
+                 (do
+                   (ungetc c in)
+                   (parse-word in))))))
+        (if (null current-node)
+          (do
+            (setf retval next-node)
+            (setv current-node next-node))
+          (setf (:@ current-node next-node) next-node)))))))
+                 
+               
+
+
+(def eval (macro intern (void)
+  (let ((fnode \ (parse stdin))
+        (exp \ (qq let ((fn \ (fn (attr cto) int (void)
+                              ((uql fnode))
+                              0)))
+                 (funcall fn)))
+        (err \ (eval-expression mc (q int) exp (cast (# b) (p void)))))
+    (or err
+        (printf "Error: Function does not exist\n"))))
+  (q (eval)))
+
+(def eval-old (macro intern (void)
+  (let ((str (array-of 250 char))
+        (strp (p char) str))
+    (fgets strp 250 stdin)
+    ;(strtok strp "\n")
+    (let ((first-node (p DNode) (nullptr DNode))
+          (last-node (p DNode) (nullptr DNode)))
+      (for (next (p char) (strsep (# strp) " "))
+           (not (null next))
+           (setv next (strsep (# strp) " \n"))
+        (or (= (@$ next 0) (@$ "" 0))
+          (let ((list-node (p DNode) (mnfv mc next)))
+            (setf (:@ list-node is-list) 0)
+            (if (null first-node)
+              (do
+                (setv first-node list-node)
+                (setv last-node list-node))
+              (do
+                (setf (:@ last-node next-node) list-node)
+                (setv last-node list-node))))))
+      (let ((b int)
+            (exp \ (qq let ((fn \ (fn (attr cto) int (void)
+                                  ((uql first-node))
+                                  0)))
+                     (funcall fn)))
+            (err \ (eval-expression mc (q int) exp (cast (# b) (p void)))))
+        (or err
+            (printf "Error: Function does not exist\n"))))
+  (q (eval-old)))))
+)
+
+
+(eval)
+
+
+(def a (fn intern void (void)))
+
+;;def a (fn intern void (void))
+
+
